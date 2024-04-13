@@ -22,7 +22,7 @@ import copy
 from phc.utils.torch_utils import project_to_norm
 import learning.amp_datasets as amp_datasets
 from phc.learning.loss_functions import kl_multi
-from uhc.utils.math_utils import LinearAnneal
+from smpl_sim.utils.math_utils import LinearAnneal
 
 def load_my_state_dict(target, saved_dict):
     for name, param in saved_dict.items():
@@ -58,11 +58,10 @@ class AMPAgent(common_agent.CommonAgent):
         # ZL Hack
         if self.vec_env.env.task.fitting:
             print("#################### Fitting and freezing!! ####################")
-            checkpoint = torch_ext.load_checkpoint(self.vec_env.env.task.models_path[0])
-            
-            self.set_stats_weights(checkpoint)  # loads mean std. essential for distilling knowledge. will not load if has a shape mismatch.
+            # checkpoint = torch_ext.load_checkpoint(self.vec_env.env.task.models_path[0])
+            # self.set_stats_weights(checkpoint)  # loads mean std. essential for distilling knowledge. will not load if has a shape mismatch.
             self.freeze_state_weights()  # freeze the mean stds.
-            load_my_state_dict(self.model.state_dict(), checkpoint['model'])  # loads everything (model, std, ect.). that can be load from the last model.
+            # load_my_state_dict(self.model.state_dict(), checkpoint['model'])  # loads everything (model, std, ect.). that can be load from the last model.
             # self.value_mean_std # not freezing value function though.
         
         return

@@ -250,6 +250,11 @@ class HumanoidImMCPDemo(humanoid_im_mcp.HumanoidImMCP):
             self.prev_ref_body_pos = ref_rb_pos
             self.prev_ref_body_rot = ref_rb_rot
         elif self.obs_v == 7:
+            ## TODO get j3d from pkl file
+            ## Try to find a way to get
+            
+            # gts = self._motion_lib.gts
+            # ref_rb_pos =   
             pose_res = requests.get(f'http://{SERVER}:8080/get_pose')
             json_data = pose_res.json()
             ref_rb_pos = np.array(json_data["j3d"])[:self.num_envs, smpl_2_mujoco]

@@ -206,7 +206,7 @@ class MotionLibBase():
             sample_idxes = torch.multinomial(self._sampling_prob, num_samples=num_motion_to_load, replacement=True).to(self._device)
         else:
             # sample_idxes = torch.remainder(torch.arange(len(skeleton_trees)) + start_idx, self._num_unique_motions ).to(self._device)
-            sample_idxes = torch.tensor([1], device='cuda:0')
+            sample_idxes = torch.tensor([1]).to(self._device)
 
         # import ipdb; ipdb.set_trace()
         self._curr_motion_ids = sample_idxes

@@ -25,6 +25,8 @@ from torchvision import transforms as T
 import time
 from ultralytics import YOLO
 import scipy.interpolate as interpolate
+import os
+import json
 
 gpus = tf.config.experimental.list_physical_devices('GPU')
 for gpu in gpus:
@@ -98,6 +100,7 @@ def start_pose_estimate():
     global pose_mat, trans, dt, reset_offset, offset_height, superfast, j3d, j2d, num_ppl, bbox, frame, fps
     offset = np.zeros((5, 1))
 
+
     from scipy.spatial.transform import Rotation as sRot
     global_transform = sRot.from_quat([0.5, 0.5, 0.5, 0.5]).inv().as_matrix()
     transform = sRot.from_euler('xyz', np.array([-np.pi / 2, 0, 0]), degrees=False).as_matrix()
@@ -108,7 +111,7 @@ def start_pose_estimate():
     
     # model = tf.saved_model.load(download_model('metrabs_mob3l_y4'))
     model = hub.load('https://bit.ly/metrabs_s') # or _l
-
+    print("model loaded!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     skeleton = 'smpl_24'
     joint_names = model.per_skeleton_joint_names[skeleton].numpy().astype(str)
     joint_edges = model.per_skeleton_joint_edges[skeleton].numpy()
@@ -225,6 +228,7 @@ def commandline_input():
 
 def frames_from_webcam():
     global frame, images_acc, recording, j2d, bbox
+    #cap = cv2.VideoCapture("data/Xindong_Walking.MOV")
     cap = cv2.VideoCapture(-1)
     prev_box = None
     
@@ -278,7 +282,10 @@ async def pose_getter(request):
             "trans": trans.tolist(),
             "dt": dt,
         }
-        
+
+    filename = 'pose.json'
+    with open(filename, 'w', encoding='utf-8') as f:
+        json.dump(json_resp, f)
     return web.json_response(json_resp)
 
 # async def commad_interface(request):

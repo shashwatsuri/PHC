@@ -32,8 +32,6 @@ Official implementation of ICCV 2023 paper: "Perpetual Humanoid Control for Real
 
 ## News 🚩
 
-[Apirl 5, 2024] Upgrading to use [SMPLSim](https://github.com/ZhengyiLuo/SMPLSim) to automatically create the SMPL humanoid. Please run `pip install git+https://github.com/ZhengyiLuo/SMPLSim.git@master` to SMPLSim. SMPLSim requires python 3.8; for python 3.7, please `pip install git+https://github.com/ZhengyiLuo/SMPLSim.git@isaac37`.
-
 [Feburary 28, 2024] Releasing Auto-PMCP procedure to train single primitives; this procedure can lead to very high-performant imiatators without PNN, though it wouldn't have the failure state recovery capability. See the `auto_pmcp_soft` flag. 
 
 [Feburary 19, 2024] Releasing PHC+ model (100% success rate on AMASS) used in [PULSE](https://zhengyiluo.github.io/PULSE/).
@@ -129,7 +127,7 @@ pip install -r requirement.txt
 
 Make sure you have the SMPL paramters properly setup by running the following scripts:
 ```
-python scripts/vis/vis_motion_mj.py
+python uhc/smpllib/smpl_local_robot.py
 python scripts/joint_monkey_smpl.py
 ```
 
@@ -162,11 +160,11 @@ To evaluate with your own SMPL data, see the script `scripts/data_process/conver
 | ; | cancel screen shot|
 | m | cancel termination based on imitation |
 
-... more shortcut can be found in `phc/env/tasks/base_task.py`
+... more shortcut can be found in `pacer/env/tasks/base_task.py`
 
-Notes on rendering: I am using pyvirtualdisplay to record the video such that you can see all humanoids at the same time (default function will only capture the first environment). You can disable it using the flag `no_virtual_display=True`. 
+Notes on rendering: I am using pyvirtualdisplay to record the video such that you can see all humanoids at the same time (default function will only capture the first environment). You can disable it using the flag `--no_virtual_display`. 
 
-You can use the `render_o3d=True no_virtual_display=True` flag to render the SMPL mesh together with your Isaac Gym simulation in real time like this: 
+You can use the `--render_o3d --no_virtual_display` flag to render the SMPL mesh together with your Isaac Gym simulation in real time like this: 
 <div float="center">
   <img src="assets/open3d.gif" />
 </div>

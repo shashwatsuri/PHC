@@ -280,15 +280,21 @@ class HumanoidImMCPDemo(humanoid_im_mcp.HumanoidImMCP):
 
             ref_rb_pos = ref_rb_pos - trans
             ############################## Limb Length ##############################
-            limb_lengths = []
-            for i in range(6):
-                parent = self.skeleton_trees[0].parent_indices[i]
-                if parent != -1:
-                    limb_lengths.append(np.linalg.norm(ref_rb_pos[:, parent] - ref_rb_pos[:, i], axis = -1))
-            limb_lengths = np.array(limb_lengths).transpose(1, 0)
-            scale = (limb_lengths/self.mean_limb_lengths).mean(axis = -1)
+            # limb_lengths = []
+            # for i in range(6):
+            #     parent = self.skeleton_trees[0].parent_indices[i]
+            #     if parent != -1:
+            #         limb_lengths.append(np.linalg.norm(ref_rb_pos[:, parent] - ref_rb_pos[:, i], axis = -1))
+            # limb_lengths = np.array(limb_lengths).transpose(1, 0)
+            # scale = (limb_lengths/self.mean_limb_lengths).mean(axis = -1)
             #ref_rb_pos /= scale[:, None, None]
             ############################## Limb Length ##############################
+
+
+            ############################## Noise ##############################
+            # ref_rb_pos[:,13,:] += 2
+            ############################## Noise ##############################
+
             s_dt = 1/self._motion_lib._motion_fps.numpy()
             # s_dt = 1/30
             self.root_pos_acc.append(trans)

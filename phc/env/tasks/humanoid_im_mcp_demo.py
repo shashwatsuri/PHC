@@ -27,6 +27,7 @@ from collections import deque
 import scipy.ndimage.filters as filters
 from smpl_sim.utils.transform_utils import quat_correct_two_batch
 import subprocess
+import time
 
 SERVER = "0.0.0.0"
 smpl_2_mujoco = [0, 1, 4, 7, 10, 2, 5, 8, 11, 3, 6, 9, 12, 15, 13, 16, 18, 20, 22, 14, 17, 19, 21, 23]
@@ -64,6 +65,8 @@ class HumanoidImMCPDemo(humanoid_im_mcp.HumanoidImMCP):
         flags.show_traj = True
         self.close_distance = 0.5
         self.mean_limb_lengths = np.array([0.1061, 0.3624, 0.4015, 0.1384, 0.1132], dtype=np.float32)[None, :]
+        self.frame_id = 0
+        self.time = time.time()
         
     async def talk(self):
         URL = f'http://{SERVER}:8080/ws'
@@ -252,12 +255,22 @@ class HumanoidImMCPDemo(humanoid_im_mcp.HumanoidImMCP):
         elif self.obs_v == 7:
             ## TODO get j3d from pkl file
             ## Try to find a way to get
-            
-            # gts = self._motion_lib.gts
-            # ref_rb_pos =   
-            pose_res = requests.get(f'http://{SERVER}:8080/get_pose')
-            json_data = pose_res.json()
-            ref_rb_pos = np.array(json_data["j3d"])[:self.num_envs, smpl_2_mujoco]
+            new_time = time.time()
+            elapsed_time = new_time-self.time
+            self.time = new_time
+            self.frame_id += round(30*elapsed_time)
+
+            if(self.frame_id >= self._motion_lib.gts.shape[0]):
+                self.frame_id=0
+            ref_rb_pos = np.array(self._motion_lib.gts[self.frame_id])#1,24,3
+            ref_rb_pos = ref_rb_pos[np.newaxis, :, :]
+            ref_rb_pos = ref_rb_pos[:, :, [0, 2, 1]]
+            ref_rb_pos[:, :, 1] *= -1
+            #transform = sRot.from_euler('xyz', np.array([np.pi / 2, 0, 0]), degrees=False)
+            #ref_rb_pos = transform * ref_rb_pos
+            # pose_res = requests.get(f'http://{SERVER}:8080/get_pose')
+            # json_data = pose_res.json()
+            # ref_rb_pos = np.array(json_data["j3d"])[:self.num_envs, smpl_2_mujoco] #1,24,3
             trans = ref_rb_pos[:, [0]]
 
             # if len(self.root_pos_acc) > 0 and np.linalg.norm(trans - self.root_pos_acc[-1]) > 1:
@@ -274,10 +287,10 @@ class HumanoidImMCPDemo(humanoid_im_mcp.HumanoidImMCP):
                     limb_lengths.append(np.linalg.norm(ref_rb_pos[:, parent] - ref_rb_pos[:, i], axis = -1))
             limb_lengths = np.array(limb_lengths).transpose(1, 0)
             scale = (limb_lengths/self.mean_limb_lengths).mean(axis = -1)
-            ref_rb_pos /= scale[:, None, None]
+            #ref_rb_pos /= scale[:, None, None]
             ############################## Limb Length ##############################
-            s_dt = 1/30
-            
+            s_dt = 1/self._motion_lib._motion_fps.numpy()
+            # s_dt = 1/30
             self.root_pos_acc.append(trans)
             filtered_root_trans = np.array(self.root_pos_acc)
             filtered_root_trans[..., 2] = filters.gaussian_filter1d(filtered_root_trans[..., 2], 10, axis=0, mode="mirror") # More filtering on the root translation
@@ -293,7 +306,6 @@ class HumanoidImMCPDemo(humanoid_im_mcp.HumanoidImMCP):
             ref_rb_pos = ref_rb_pos.matmul(self.to_isaac_mat.T).cuda()
 
             ref_body_vel = SkeletonMotion._compute_velocity(torch.stack([self.prev_ref_body_pos, ref_rb_pos], dim=1), time_delta=s_dt, guassian_filter=False)[:, 0]  # 
-
             time_steps = 1
             ref_rb_pos_subset = ref_rb_pos[..., self._track_bodies_id, :]
             ref_body_vel_subset = ref_body_vel[..., self._track_bodies_id, :]
@@ -313,6 +325,7 @@ class HumanoidImMCPDemo(humanoid_im_mcp.HumanoidImMCP):
             obs = humanoid_im.compute_imitation_observations_v7(root_pos, root_rot, body_pos_subset, body_vel_subset, ref_rb_pos_subset, ref_body_vel_subset, time_steps, self._has_upright_start)
 
             self.prev_ref_body_pos = ref_rb_pos
+
 
         if len(env_ids) == self.num_envs:
             self.ref_body_pos = ref_rb_pos

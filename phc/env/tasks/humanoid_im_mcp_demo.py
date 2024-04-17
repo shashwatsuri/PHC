@@ -67,6 +67,9 @@ class HumanoidImMCPDemo(humanoid_im_mcp.HumanoidImMCP):
         self.mean_limb_lengths = np.array([0.1061, 0.3624, 0.4015, 0.1384, 0.1132], dtype=np.float32)[None, :]
         self.frame_id = 0
         self.time = time.time()
+        self.ou_noise = self.simulate_ou_noise(0.002,0.02)
+        self.g_noise = self.simulate_gaussian_noise(0.1)
+        self.joint_id = 7
         
     async def talk(self):
         URL = f'http://{SERVER}:8080/ws'
@@ -278,7 +281,7 @@ class HumanoidImMCPDemo(humanoid_im_mcp.HumanoidImMCP):
             # print("juping!!")
             ref_rb_pos_orig = ref_rb_pos.copy()
 
-            ref_rb_pos = ref_rb_pos - trans
+            
             ############################## Limb Length ##############################
             # limb_lengths = []
             # for i in range(6):
@@ -291,9 +294,18 @@ class HumanoidImMCPDemo(humanoid_im_mcp.HumanoidImMCP):
             ############################## Limb Length ##############################
 
 
+
             ############################## Noise ##############################
-            # ref_rb_pos[:,13,:] += 2
+            noise_array,rescaling_factor = self.scale_array(ref_rb_pos)
+
+            #noise_array[0,self.joint_id,:] += self.g_noise[self.frame_id,:]
+            noise_array[0,self.joint_id,:] += self.ou_noise[self.frame_id,:]
+
+
+            ref_rb_pos = self.rescale_array(noise_array,rescaling_factor)
+            
             ############################## Noise ##############################
+            ref_rb_pos = ref_rb_pos - trans
 
             s_dt = 1/self._motion_lib._motion_fps.numpy()
             # s_dt = 1/30
@@ -343,4 +355,34 @@ class HumanoidImMCPDemo(humanoid_im_mcp.HumanoidImMCP):
     def _compute_reset(self):
         self.reset_buf[:] = 0
         self._terminate_buf[:] = 0
-        
+
+    def scale_array(self, array):
+        max_abs_value = np.max(np.abs(array))
+        scaled_array = array / max_abs_value
+        rescaling_factor = max_abs_value
+        return scaled_array,rescaling_factor
+    
+    def rescale_array(self,array,rescaling_factor):
+        return array * rescaling_factor
+    
+    def simulate_ou_noise(self, theta, sigma, mu=0.0):
+        num_time_steps = self._motion_lib.gts.shape[0]
+        delta_t = self._motion_lib._motion_fps.numpy()
+        # Initialize the array for noise
+        noise = np.zeros((num_time_steps, 3))
+        # Initial values can optionally be set to different values
+        noise[0, :] = np.random.normal(mu, sigma, 3)
+
+        # Generate noise for each time step
+        for t in range(1, num_time_steps):
+            dt = delta_t
+            dw = np.random.normal(0, np.sqrt(dt), 3)  # Brownian increments
+            noise[t, :] = noise[t - 1, :] + theta * (mu - noise[t - 1, :]) * dt + sigma * dw
+
+        return noise
+
+    def simulate_gaussian_noise(self, sigma, mu=0.0):
+        size = (self._motion_lib.gts.shape[0],3)
+        noise = np.random.normal(mu, sigma, size)
+        # Generate noise for each point in time       
+        return noise

@@ -140,8 +140,8 @@ class MotionLibBase():
             if min_length != -1:
                 data_list = {k: v for k, v in list(self._motion_data_load.items()) if len(v['pose_quat_global']) >= min_length}
             elif im_eval:
-                data_list = {item[0]: item[1] for item in sorted(self._motion_data_load.items(), key=lambda entry: len(entry[1]['pose_quat_global']), reverse=True)}
-                # data_list = self._motion_data
+                # data_list = {item[0]: item[1] for item in sorted(self._motion_data_load.items(), key=lambda entry: len(entry[1]['pose_quat_global']), reverse=True)}
+                data_list = self._motion_data_load
             else:
                 data_list = self._motion_data_load
 
@@ -205,8 +205,8 @@ class MotionLibBase():
         if random_sample:
             sample_idxes = torch.multinomial(self._sampling_prob, num_samples=num_motion_to_load, replacement=True).to(self._device)
         else:
-            # sample_idxes = torch.remainder(torch.arange(len(skeleton_trees)) + start_idx, self._num_unique_motions ).to(self._device)
-            sample_idxes = torch.tensor([26]).to(self._device)
+            sample_idxes = torch.remainder(torch.arange(len(skeleton_trees)) + start_idx, self._num_unique_motions ).to(self._device)
+            # sample_idxes = torch.tensor([10]).to(self._device)
 
         # import ipdb; ipdb.set_trace()
         self._curr_motion_ids = sample_idxes

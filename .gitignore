@@ -141,3 +141,6 @@ output_videos/
 new_trials
 gh-md-toc
 sample_data
+metrabs_eff2l_384px_800k_28ds_pytorch/joint_transform_matrix.npy
+metrabs_eff2l_384px_800k_28ds_pytorch/joint_info.npz
+metrabs_eff2l_384px_800k_28ds_pytorch/config.yaml

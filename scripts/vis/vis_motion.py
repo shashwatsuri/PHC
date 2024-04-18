@@ -193,7 +193,7 @@ for body_name in key_body_names:
 gym.prepare_sim(sim)
 body_ids = np.array(body_ids)
 
-motion_file = "data/amass/pkls/amass_isaac_im_patch_upright_slim.pkl"
+motion_file = "data/amass/pkls/our_thing.pkl"
 # motion_file = "data/amass/pkls/amass_isaac_im_train_upright_slim.pkl"
 # motion_file = "data/amass/pkls/amass_isaac_locomotion_upright.pkl"
 # motion_file = "data/amass/pkls/amass_isaac_slowalk_upright.pkl"

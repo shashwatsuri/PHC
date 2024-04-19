@@ -28,7 +28,7 @@ train: True
 noise_sigma: 0.0
 noise_theta: 0.0
 joint_id_noise: 7
-motion_id: 3
+motion_id: -1
 
 
 ####### Testing Configs. ########

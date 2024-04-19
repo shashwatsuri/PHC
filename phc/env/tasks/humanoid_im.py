@@ -632,8 +632,8 @@ class HumanoidIm(humanoid_amp_task.HumanoidAMPTask):
             motion_times = (self.progress_buf) * self.dt + self._motion_start_times + self._motion_start_times_offset  # already has time + 1, so don't need to + 1 to get the target for "this frame"
             motion_res = self._get_state_from_motionlib_cache(self._sampled_motion_ids, motion_times, self._global_offset)  # pass in the env_ids such that the motion is in synced.
             body_pos = self._rigid_body_pos
-            # a = torch.cat((body_pos[:self.joint_id], body_pos[self.joint_id+1:]))
-            # b = torch.cat((motion_res['rg_pos'][:self.joint_id], motion_res['rg_pos'][self.joint_id+1:]))
+            a = torch.cat((body_pos[:self.cfg.joint_id_noise], body_pos[self.cfg.joint_id_noise+1:]))
+            b = torch.cat((motion_res['rg_pos'][:self.cfg.joint_id_noise], motion_res['rg_pos'][self.cfg.joint_id_noise+1:]))
             self.extras['mpjpe'] = (body_pos - motion_res['rg_pos']).norm(dim=-1).mean(dim=-1)
             self.extras['body_pos'] = body_pos.cpu().numpy()
             self.extras['body_pos_gt'] = motion_res['rg_pos'].cpu().numpy()

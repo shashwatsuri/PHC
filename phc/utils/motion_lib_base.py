@@ -21,6 +21,10 @@ from scipy.spatial.transform import Rotation as sRot
 import random
 from phc.utils.flags import flags
 from enum import Enum
+
+# import noise functions
+from phc.env.util.noise import scale_array_torch, rescale_array, simulate_gaussian_noise_torch, simulate_ou_noise_torch
+
 USE_CACHE = False
 print("MOVING MOTION DATA TO GPU, USING CACHE:", USE_CACHE)
 
@@ -202,11 +206,15 @@ class MotionLibBase():
         self.num_joints = len(skeleton_trees[0].node_names)
         num_motion_to_load = len(skeleton_trees)
 
-        if random_sample:
-            sample_idxes = torch.multinomial(self._sampling_prob, num_samples=num_motion_to_load, replacement=True).to(self._device)
+
+        if flags.motion_id == -1:
+            if random_sample:
+                sample_idxes = torch.multinomial(self._sampling_prob, num_samples=num_motion_to_load, replacement=True).to(self._device)
+            else:
+                sample_idxes = torch.remainder(torch.arange(len(skeleton_trees)) + start_idx, self._num_unique_motions ).to(self._device)
+                # sample_idxes = torch.tensor([10]).to(self._device)
         else:
-            sample_idxes = torch.remainder(torch.arange(len(skeleton_trees)) + start_idx, self._num_unique_motions ).to(self._device)
-            # sample_idxes = torch.tensor([10]).to(self._device)
+            sample_idxes = torch.tensor([flags.motion_id]).to(self._device)
 
         # import ipdb; ipdb.set_trace()
         self._curr_motion_ids = sample_idxes
@@ -310,6 +318,17 @@ class MotionLibBase():
             self.q_gavs = torch.cat(self.q_gavs, dim=0).float().to(self._device)
             self.q_gvs = torch.cat(self.q_gvs, dim=0).float().to(self._device)
 
+        if flags.noise_sigma > 0.0:
+            joint_id_noise = flags.joint_id_noise
+            if flags.noise_theta == 0:
+                noise = simulate_gaussian_noise_torch(self.gts.shape[0], flags.noise_sigma).to(self._device)
+            else:
+                noise = simulate_ou_noise_torch(self.gts.shape[0], 1/self._motion_fps, flags.noise_theta, flags.noise_sigma).to(self._device)
+            
+            scaled_gts, scaled_factor = scale_array_torch(self.gts)
+            scaled_gts[:, joint_id_noise, :] += noise
+            self.gts = rescale_array(scaled_gts, scaled_factor)
+            
         lengths = self._motion_num_frames
         lengths_shifted = lengths.roll(1)
         lengths_shifted[0] = 0

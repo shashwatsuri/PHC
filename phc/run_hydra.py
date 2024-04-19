@@ -282,6 +282,10 @@ def main(cfg_hydra: DictConfig) -> None:
     flags.add_proj = cfg.add_proj
     flags.has_eval = cfg.has_eval
     flags.trigger_input = False
+    flags.noise_sigma = cfg.noise_sigma
+    flags.noise_theta = cfg.noise_theta
+    flags.joint_id_noise = cfg.joint_id_noise
+    flags.motion_id = cfg.motion_id
 
     if cfg.server_mode:
         flags.follow = cfg.follow = True

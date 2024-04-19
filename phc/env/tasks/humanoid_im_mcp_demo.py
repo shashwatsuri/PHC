@@ -9,6 +9,7 @@ from phc.env.tasks.humanoid_amp import HumanoidAMP, remove_base_rot
 from phc.utils.motion_lib_smpl import MotionLibSMPL 
 
 from phc.utils import torch_utils
+# from phc.env.util.noise import scale_array_torch, rescale_array, simulate_gaussian_noise_torch, simulate_ou_noise_torch
 
 from isaacgym import gymapi
 from isaacgym import gymtorch
@@ -67,9 +68,9 @@ class HumanoidImMCPDemo(humanoid_im_mcp.HumanoidImMCP):
         self.mean_limb_lengths = np.array([0.1061, 0.3624, 0.4015, 0.1384, 0.1132], dtype=np.float32)[None, :]
         self.frame_id = 0
         self.time = time.time()
-        self.ou_noise = self.simulate_ou_noise(0.002,0.02)
-        self.g_noise = self.simulate_gaussian_noise(0.1)
-        self.joint_id = 7
+        # self.ou_noise = simulate_ou_noise_torch(self._motion_lib.gts.shape[0], 1/self._motion_lib._motion_fps, 0.002,0.1).to(self._motion_lib._device)
+        # self.g_noise = simulate_gaussian_noise_torch(self._motion_lib.gts.shape[0], 0.1).to(self._motion_lib._device)
+        # self.joint_id = 7
         
     async def talk(self):
         URL = f'http://{SERVER}:8080/ws'
@@ -182,79 +183,6 @@ class HumanoidImMCPDemo(humanoid_im_mcp.HumanoidImMCP):
 
         if self.obs_v == 6:
             raise NotImplementedError
-            # This part is not as good. use obs_v == 7 instead.
-            # ref_rb_pos = self.j3d[((self.progress_buf[env_ids] + 1) / 2).long() % self.j3d.shape[0]]
-            # ref_body_vel = self.j3d_vel[((self.progress_buf[env_ids] + 1) / 2).long() % self.j3d_vel.shape[0]]
-            # pose_mat = self.pose_mat.clone()
-            # trans = self.trans.clone()
-
-            # pose_mat = self.rot_mat_ref[((self.progress_buf[env_ids] + 1) / 2).long() % self.rot_mat_ref.shape[0]] # debugging
-            pose_res = requests.get(f'http://{SERVER}:8080/get_pose')
-            json_data = pose_res.json()
-            pose_mat = torch.tensor(json_data["pose_mat"])[None,].float()
-            # trans = torch.tensor(json_data["trans"]).to(self.device).float()
-
-            trans = np.array(json_data["trans"]).squeeze()
-            s_dt = json_data['dt']
-            self.root_pos_acc.append(trans)
-            filtered_trans = filters.gaussian_filter1d(self.root_pos_acc, 3, axis=0, mode="mirror")
-            trans = torch.tensor(filtered_trans[-1]).float()
-
-            new_root = self.to_isaac_mat.matmul(pose_mat[:, 0])
-            pose_mat[:, 0] = new_root
-            trans = trans.matmul(self.to_isaac_mat.T)
-            _, global_rotation = humanoid_kin.forward_kinematics_batch(pose_mat[:, smpl_2_mujoco], self.zero_trans, self.local_translation_batch, self.parent_indices)
-
-            ref_rb_rot = ptr.matrix_to_quaternion_ijkr(global_rotation.matmul(self.to_global))
-
-            ##################  ##################
-            ref_rb_rot_np = ref_rb_rot.numpy()[0]
-
-            if len(self.body_rot_acc) > 0:
-                ref_rb_rot_np = quat_correct_two_batch(self.body_rot_acc[-1], ref_rb_rot_np)
-                filtered_quats = filters.gaussian_filter1d(np.concatenate([self.body_rot_acc, ref_rb_rot_np[None,]], axis=0), 1, axis=0, mode="mirror")
-                new_quat = filtered_quats[-1] / np.linalg.norm(filtered_quats[-1], axis=1)[:, None]
-                self.body_rot_acc.append(new_quat)  # add the filtered quat.
-
-                # pose_quat_global = np.array(self.body_rot_acc)
-                # select_quats = np.linalg.norm(pose_quat_global[:-1, :] - pose_quat_global[1:, :], axis=2) > np.linalg.norm(pose_quat_global[:-1, :] + pose_quat_global[1:, :], axis=2)
-                ref_rb_rot = torch.tensor(new_quat[None,]).float()
-            else:
-                self.body_rot_acc.append(ref_rb_rot_np)
-
-            ################## ##################
-
-            ref_rb_pos = SkeletonState.from_rotation_and_root_translation(self.skeleton_trees[0], ref_rb_rot, trans, is_local=False).global_translation.to(self.device)  # SLOWWWWWWW
-            ref_rb_rot = ref_rb_rot.to(self.device)
-            ref_rb_pos = ref_rb_pos.to(self.device)
-            ref_body_ang_vel = SkeletonMotion._compute_angular_velocity(torch.stack([self.prev_ref_body_rot, ref_rb_rot], dim=1), time_delta=s_dt, guassian_filter=False)[:, 0]
-            ref_body_vel = SkeletonMotion._compute_velocity(torch.stack([self.prev_ref_body_pos, ref_rb_pos], dim=1), time_delta=s_dt, guassian_filter=False)[:, 0]  # this is slow!
-
-
-            time_steps = 1
-            ref_rb_pos_subset = ref_rb_pos[..., self._track_bodies_id, :]
-            ref_body_vel_subset = ref_body_vel[..., self._track_bodies_id, :]
-            ref_rb_rot_subset = ref_rb_rot[..., self._track_bodies_id, :]
-            ref_body_ang_vel_subset = ref_body_ang_vel[..., self._track_bodies_id, :]
-
-            if self.zero_out_far:
-                close_distance = self.close_distance
-                distance = torch.norm(root_pos - ref_rb_pos_subset[..., 0, :], dim=-1)
-
-                zeros_subset = distance > close_distance
-                ref_rb_pos_subset[zeros_subset, 1:] = body_pos_subset[zeros_subset, 1:]
-                ref_rb_rot_subset[zeros_subset, 1:] = body_rot_subset[zeros_subset, 1:]
-                ref_body_vel_subset[zeros_subset, :] = body_vel_subset[zeros_subset, :]
-                ref_body_ang_vel_subset[zeros_subset, :] = body_ang_vel_subset[zeros_subset, :]
-
-                far_distance = 3  # does not seem to need this in particular...
-                vector_zero_subset = distance > far_distance  # > 5 meters, it become just a direction
-                ref_rb_pos_subset[vector_zero_subset, 0] = ((ref_rb_pos_subset[vector_zero_subset, 0] - body_pos_subset[vector_zero_subset, 0]) / distance[vector_zero_subset, None] * far_distance) + body_pos_subset[vector_zero_subset, 0]
-
-            obs = humanoid_im.compute_imitation_observations_v6(root_pos, root_rot, body_pos_subset, body_rot_subset, body_vel_subset, body_ang_vel_subset, ref_rb_pos_subset, ref_rb_rot_subset, ref_body_vel_subset, ref_body_ang_vel_subset, time_steps, self._has_upright_start)
-
-            self.prev_ref_body_pos = ref_rb_pos
-            self.prev_ref_body_rot = ref_rb_rot
         elif self.obs_v == 7:
             ## TODO get j3d from pkl file
             ## Try to find a way to get
@@ -292,19 +220,6 @@ class HumanoidImMCPDemo(humanoid_im_mcp.HumanoidImMCP):
             # scale = (limb_lengths/self.mean_limb_lengths).mean(axis = -1)
             #ref_rb_pos /= scale[:, None, None]
             ############################## Limb Length ##############################
-
-
-
-            ############################## Noise ##############################
-            noise_array,rescaling_factor = self.scale_array(ref_rb_pos)
-
-            #noise_array[0,self.joint_id,:] += self.g_noise[self.frame_id,:]
-            noise_array[0,self.joint_id,:] += self.ou_noise[self.frame_id,:]
-
-
-            ref_rb_pos = self.rescale_array(noise_array,rescaling_factor)
-            
-            ############################## Noise ##############################
             ref_rb_pos = ref_rb_pos - trans
 
             s_dt = 1/self._motion_lib._motion_fps.numpy()
@@ -322,6 +237,16 @@ class HumanoidImMCPDemo(humanoid_im_mcp.HumanoidImMCP):
 
             ref_rb_pos = torch.from_numpy(ref_rb_pos + trans).float()
             ref_rb_pos = ref_rb_pos.matmul(self.to_isaac_mat.T).cuda()
+
+            ############################## Noise ##############################
+            # noise_array,rescaling_factor = scale_array_torch(ref_rb_pos)
+
+            # noise_array[0,self.joint_id,:] += self.g_noise[self.frame_id,:]
+            # noise_array[0,self.joint_id,:] += self.ou_noise[self.frame_id,:]
+
+
+            # ref_rb_pos = rescale_array(noise_array,rescaling_factor)
+            ############################## Noise ##############################
 
             ref_body_vel = SkeletonMotion._compute_velocity(torch.stack([self.prev_ref_body_pos, ref_rb_pos], dim=1), time_delta=s_dt, guassian_filter=False)[:, 0]  # 
             time_steps = 1
@@ -356,33 +281,4 @@ class HumanoidImMCPDemo(humanoid_im_mcp.HumanoidImMCP):
         self.reset_buf[:] = 0
         self._terminate_buf[:] = 0
 
-    def scale_array(self, array):
-        max_abs_value = np.max(np.abs(array))
-        scaled_array = array / max_abs_value
-        rescaling_factor = max_abs_value
-        return scaled_array,rescaling_factor
     
-    def rescale_array(self,array,rescaling_factor):
-        return array * rescaling_factor
-    
-    def simulate_ou_noise(self, theta, sigma, mu=0.0):
-        num_time_steps = self._motion_lib.gts.shape[0]
-        delta_t = self._motion_lib._motion_fps.numpy()
-        # Initialize the array for noise
-        noise = np.zeros((num_time_steps, 3))
-        # Initial values can optionally be set to different values
-        noise[0, :] = np.random.normal(mu, sigma, 3)
-
-        # Generate noise for each time step
-        for t in range(1, num_time_steps):
-            dt = delta_t
-            dw = np.random.normal(0, np.sqrt(dt), 3)  # Brownian increments
-            noise[t, :] = noise[t - 1, :] + theta * (mu - noise[t - 1, :]) * dt + sigma * dw
-
-        return noise
-
-    def simulate_gaussian_noise(self, sigma, mu=0.0):
-        size = (self._motion_lib.gts.shape[0],3)
-        noise = np.random.normal(mu, sigma, size)
-        # Generate noise for each point in time       
-        return noise
